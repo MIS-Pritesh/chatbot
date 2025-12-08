@@ -8,7 +8,7 @@ from collections import OrderedDict
 # ======================================================================
 
 # Define the expected filename
-CSV_FILE_PATH = "data.csv"
+CSV_FILE_PATH = "Data.csv"
 
 def load_and_structure_data(file_path):
     """
