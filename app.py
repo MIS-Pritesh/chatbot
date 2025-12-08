@@ -81,10 +81,10 @@ def get_fixed_answer(question):
 
 
 # ======================================================================
-# 3. THEME INJECTION AND STREAMLIT SETUP (Clean UI)
+# 3. THEME INJECTION AND STREAMLIT SETUP
 # ======================================================================
 
-# --- Simplified Theme Injection (Forces a default dark theme) ---
+# --- Simplified Theme Injection (Defaults to Dark, No User Control) ---
 def inject_default_css():
     css = """
     :root {
@@ -95,6 +95,7 @@ def inject_default_css():
     """
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
+# Apply a default theme
 inject_default_css()
 
 # --- State Initialization ---
@@ -126,30 +127,37 @@ def display_menu(menu_dict):
 
 # Helper function to process user clicks
 def handle_user_selection(value):
-    # Log the question (user's selection) as an action by the bot for continuity
-    st.session_state.chat_history.append({"role": "assistant", "content": f"**Question:** {value}"})
     
+    # --- FIX APPLIED HERE: OVERWRITE LAST MESSAGE ---
+    if st.session_state.chat_history and st.session_state.chat_history[-1]['content'] == "✅ Got it! Ready for your next question.":
+        # Overwrite the confirmation message with an empty string 
+        # (or just a small space) to make it disappear from the chat history.
+        st.session_state.chat_history[-1]['content'] = ""
+
+
     # 1. Check if the selection is a main category (i.e., a subject)
     if value in st.session_state.main_menu.values():
         st.session_state.current_menu_key = value
         
-    # 2. The selection is a specific question (Answer it)
+    # 2. The selection is a specific question
     else:
+        # Log the question and answer from the Assistant's perspective
+        st.session_state.chat_history.append({"role": "assistant", "content": f"**Question:** {value}"})
+        
         answer = get_fixed_answer(value)
         
-        # Log the final answer
         st.session_state.chat_history.append({"role": "assistant", "content": f"**Answer:** {answer}"})
         
-        # After answering, return to the main menu immediately (no conversational closure)
+        # After answering, return to the main menu
         st.session_state.current_menu_key = "MAIN"
-        # THE LINE THAT ADDED THE UNNECESSARY MESSAGE HAS BEEN REMOVED HERE
+        
+        # Add the confirmation message (which will be overwritten on next click)
+        st.session_state.chat_history.append({"role": "assistant", "content": "✅ Got it! Ready for your next question."})
 
 
 # 4. Display Chat History
 for message in st.session_state.chat_history:
-    # Use a custom icon for the assistant to distinguish from the system prompt
-    icon = "🤖" if message["role"] == "assistant" else "👤" 
-    with st.chat_message(message["role"], avatar=icon):
+    with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 
