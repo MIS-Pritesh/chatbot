@@ -124,18 +124,18 @@ def inject_theme_css(theme):
 
 
 # --- Theme Selector Logic ---
-st.sidebar.header("App Settings")
-selected_theme = st.sidebar.selectbox(
-    "Select App Theme:",
-    ["Classic Light", "Developer Dark", "Streamlit Default"]
-)
+# st.sidebar.header("App Settings")
+# selected_theme = st.sidebar.selectbox(
+#     "Select App Theme:",
+#     ["Classic Light", "Developer Dark", "Streamlit Default"]
+# )
 
-if 'app_theme' not in st.session_state or st.session_state.app_theme != selected_theme:
-    st.session_state.app_theme = selected_theme
-    st.rerun() # Rerun to apply new theme immediately
+# if 'app_theme' not in st.session_state or st.session_state.app_theme != selected_theme:
+#     st.session_state.app_theme = selected_theme
+#     st.rerun() # Rerun to apply new theme immediately
 
-# Apply the theme CSS
-inject_theme_css(st.session_state.app_theme)
+# # Apply the theme CSS
+# inject_theme_css(st.session_state.app_theme)
 
 
 # --- State Initialization ---
@@ -204,6 +204,3 @@ if st.session_state.main_menu:
             st.rerun()
             
         display_menu(menu_to_display)
-
-st.sidebar.markdown("---")
-st.sidebar.caption("This Q&A Bot is a 100% free solution powered by Python, Pandas, and Streamlit.")
