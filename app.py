@@ -7,42 +7,45 @@ from collections import OrderedDict
 # 1. DATA LOADING AND PROCESSING
 # ======================================================================
 
-# Define the expected filename
-CSV_FILE_PATH = "Data.csv"
+# FIX APPLIED HERE: File name must match your GitHub file name exactly
+CSV_FILE_NAME = "Data.csv" 
 
-def load_and_structure_data(file_path):
+@st.cache_data
+def load_and_structure_data(file_name):
     """
     Loads data from CSV, structures it into an organized dictionary
     for menu display, and returns the main subjects and sub-menus.
+    Uses st.cache_data to run only once.
     """
+    # --- Robust Path Finding ---
+    # 1. Construct the absolute path by joining the script's directory with the filename.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(script_dir, file_name)
+    
+    # Check one last time before raising the error
     if not os.path.exists(file_path):
-        st.error(f"FATAL ERROR: Data file '{file_path}' not found in the deployment directory.")
+        st.error(f"FATAL ERROR: Data file '{file_name}' not found. Please ensure the file is named **Data.csv** and is in the same directory as app.py.")
         return OrderedDict(), {}
-
+    # ---------------------------
+    
     try:
-        # Load the CSV file
         df = pd.read_csv(file_path)
         
-        # Ensure required columns exist
         REQUIRED_COLS = ['subject', 'question', 'answer']
         if not all(col in df.columns for col in REQUIRED_COLS):
             st.error(f"FATAL ERROR: CSV must contain the columns: {', '.join(REQUIRED_COLS)}")
             return OrderedDict(), {}
         
-        # Use OrderedDict to maintain the order of main subjects based on first appearance
         main_menu = OrderedDict() 
         sub_menus = {}
-
-        # Group data by the 'subject' column
         grouped_data = df.groupby('subject')
         
         for subject, group in grouped_data:
-            # 1. Build the Main Menu (subjects)
-            # Find a unique key for the main menu, e.g., '1', '2', etc.
+            # Build the Main Menu (subjects)
             key = str(len(main_menu) + 1)
             main_menu[key] = subject
             
-            # 2. Build the Sub-Menu (questions for that subject)
+            # Build the Sub-Menu (questions for that subject)
             sub_menu_questions = OrderedDict()
             for i, row in enumerate(group.itertuples()):
                 q_key = str(i + 1)
@@ -50,19 +53,18 @@ def load_and_structure_data(file_path):
             
             sub_menus[subject] = sub_menu_questions
 
-        # 3. Store the full Q&A dataframe for quick answer lookup
-        # Use cache=True for better performance, but Streamlit handles caching for load_data() 
-        st.session_state.qa_data = df
-        
-        return main_menu, sub_menus
+        return main_menu, sub_menus, df # Return the dataframe too
 
     except Exception as e:
-        st.error(f"FATAL ERROR: Failed to load or process CSV data. Check file permissions or formatting. Error: {e}")
-        return OrderedDict(), {}
+        st.error(f"FATAL ERROR: Failed to load or process CSV data. Check file formatting. Error: {e}")
+        return OrderedDict(), {}, pd.DataFrame()
 
 # Load data only once at the start of the session
 if 'main_menu' not in st.session_state:
-    st.session_state.main_menu, st.session_state.sub_menus = load_and_structure_data(CSV_FILE_PATH)
+    main_menu_data, sub_menus_data, qa_data_df = load_and_structure_data(CSV_FILE_NAME)
+    st.session_state.main_menu = main_menu_data
+    st.session_state.sub_menus = sub_menus_data
+    st.session_state.qa_data = qa_data_df
 
 
 # ======================================================================
@@ -71,15 +73,13 @@ if 'main_menu' not in st.session_state:
 
 def get_fixed_answer(question):
     """Retrieves the answer by searching the loaded DataFrame."""
-    if 'qa_data' not in st.session_state:
+    if 'qa_data' not in st.session_state or st.session_state.qa_data.empty:
         return "System error: Data not loaded."
         
     try:
-        # Search the DataFrame for the matching question
         answer_row = st.session_state.qa_data[st.session_state.qa_data['question'] == question]
         
         if not answer_row.empty:
-            # Return the first matching answer
             return answer_row.iloc[0]['answer']
         
         return "I'm sorry, I could not find a specific answer for that question in my database."
@@ -88,8 +88,55 @@ def get_fixed_answer(question):
 
 
 # ======================================================================
-# 3. STREAMLIT APPLICATION SETUP AND UI
+# 3. THEME INJECTION AND STREAMLIT SETUP
 # ======================================================================
+
+def inject_theme_css(theme):
+    """Injects custom CSS based on the selected theme."""
+    
+    custom_themes = {
+        "Classic Light": {
+            "--primary-color": "#4CAF50",  # Green button/link color
+            "--background-color": "#F0F2F6", # Very light grey background
+            "--text-color": "#333333",
+        },
+        "Developer Dark": {
+            "--primary-color": "#FF4B4B",  # Streamlit default red buttons
+            "--background-color": "#1C1C1C", # Dark charcoal background
+            "--text-color": "#CCCCCC",
+        }
+    }
+
+    if theme == "Streamlit Default":
+        st.markdown("<style></style>", unsafe_allow_html=True)
+        return
+
+    css_vars = custom_themes.get(theme, {})
+    
+    # Construct the CSS string
+    css = ":root {\n"
+    for var, color in css_vars.items():
+        css += f"  {var}: {color};\n"
+    css += "}\n"
+    
+    # Inject the CSS into the Streamlit app
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+
+
+# --- Theme Selector Logic ---
+st.sidebar.header("App Settings")
+selected_theme = st.sidebar.selectbox(
+    "Select App Theme:",
+    ["Classic Light", "Developer Dark", "Streamlit Default"]
+)
+
+if 'app_theme' not in st.session_state or st.session_state.app_theme != selected_theme:
+    st.session_state.app_theme = selected_theme
+    st.rerun() # Rerun to apply new theme immediately
+
+# Apply the theme CSS
+inject_theme_css(st.session_state.app_theme)
+
 
 # --- State Initialization ---
 if "chat_history" not in st.session_state:
@@ -100,15 +147,12 @@ if "current_menu_key" not in st.session_state:
     st.session_state.current_menu_key = "MAIN"
 
 st.title("CSV-Driven Q&A Bot 🏡")
-st.sidebar.header("Data Source")
-st.sidebar.info(f"Loaded {len(st.session_state.main_menu)} main subjects from **{CSV_FILE_PATH}**.")
 
 
 # Helper function to display the current menu buttons
 def display_menu(menu_dict):
     st.markdown("### Choose an Option:")
     
-    # Use columns for a clean button layout (up to 3 buttons per row)
     cols = st.columns(3) 
     
     for i, (key, value) in enumerate(menu_dict.items()):
@@ -122,17 +166,14 @@ def display_menu(menu_dict):
 
 # Helper function to process user clicks
 def handle_user_selection(value):
-    # 1. Log the User's question/action
     st.session_state.chat_history.append({"role": "user", "content": f"Selected: {value}"})
     
-    # 2. Check if the selection is a main category (i.e., a subject)
+    # 1. Check if the selection is a main category (i.e., a subject)
     if value in st.session_state.main_menu.values():
-        # Set state to the subject text to display its sub-menu
         st.session_state.current_menu_key = value
         
-    # 3. The selection is a specific question
+    # 2. The selection is a specific question
     else:
-        # Retrieve the fixed answer using the full question text
         answer = get_fixed_answer(value)
         
         st.session_state.chat_history.append({"role": "assistant", "content": f"**Question:** {value}\n\n**Answer:** {answer}"})
@@ -148,25 +189,21 @@ for message in st.session_state.chat_history:
         st.markdown(message["content"])
 
 
-# 5. Menu Display Logic
-
-if st.session_state.current_menu_key == "MAIN":
-    # Show the main categories (subjects from CSV)
-    display_menu(st.session_state.main_menu)
-else:
-    # We are in a sub-menu (questions for a specific subject)
-    
-    # Get the dictionary of questions for the current subject key
-    menu_to_display = st.session_state.sub_menus.get(st.session_state.current_menu_key, {})
-    
-    # Display the "Go Back" button first
-    back_button_key = f"back_btn_{st.session_state.current_menu_key}"
-    if st.button("⬅️ Go Back to Main Menu", key=back_button_key):
-        st.session_state.current_menu_key = "MAIN"
-        st.rerun()
+# 5. Menu Display Logic (only if data loaded)
+if st.session_state.main_menu:
+    if st.session_state.current_menu_key == "MAIN":
+        display_menu(st.session_state.main_menu)
+    else:
+        # We are in a sub-menu
+        menu_to_display = st.session_state.sub_menus.get(st.session_state.current_menu_key, {})
         
-    # Display the sub-menu options (questions)
-    display_menu(menu_to_display)
+        # Display the "Go Back" button first
+        back_button_key = f"back_btn_{st.session_state.current_menu_key}"
+        if st.button("⬅️ Go Back to Main Menu", key=back_button_key):
+            st.session_state.current_menu_key = "MAIN"
+            st.rerun()
+            
+        display_menu(menu_to_display)
 
 st.sidebar.markdown("---")
 st.sidebar.caption("This Q&A Bot is a 100% free solution powered by Python, Pandas, and Streamlit.")
