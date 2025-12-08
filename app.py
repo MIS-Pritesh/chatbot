@@ -15,12 +15,13 @@ def load_and_structure_data(file_name):
     """
     Loads data from CSV, structures it into an organized dictionary
     for menu display, and returns the main subjects and sub-menus.
+    Uses st.cache_data to run only once.
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(script_dir, file_name)
     
     if not os.path.exists(file_path):
-        st.error(f"FATAL ERROR: Data file '{file_name}' not found.")
+        st.error(f"FATAL ERROR: Data file '{file_name}' not found. Please ensure the file is named **Data.csv** and is in the same directory as app.py.")
         return OrderedDict(), {}, pd.DataFrame()
     
     try:
@@ -80,35 +81,23 @@ def get_fixed_answer(question):
 
 
 # ======================================================================
-# 3. THEME AND CSS INJECTION
+# 3. THEME INJECTION AND STREAMLIT SETUP (Sidebar Removed)
 # ======================================================================
 
-# --- CSS to Hide the Overwritten Message ---
-# The CSS hides any chat message element that has no visible text inside it.
-def inject_final_css():
+# --- Simplified Theme Injection (Defaults to Dark, No User Control) ---
+# To keep the code clean without the sidebar, we just force a default theme.
+def inject_default_css():
     css = """
-    /* Default Theme */
     :root {
         --primary-color: #4CAF50; 
         --background-color: #1c1c1c; 
         --text-color: #CCCCCC;
     }
-    
-    /* Target the container of the chat message that has no content */
-    .stChatMessage [data-testid="stChatMessageContent"] > div:empty {
-        display: none !important; /* Forces the box to disappear */
-    }
-    /* Also remove padding/margin from the parent container */
-    .stChatMessage [data-testid="stChatMessageContent"] {
-        margin: 0 !important;
-        padding: 0 !important;
-        height: 0 !important;
-    }
     """
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
-# Apply the theme and the hiding CSS
-inject_final_css()
+# Apply a default theme
+inject_default_css()
 
 # --- State Initialization ---
 if "chat_history" not in st.session_state:
@@ -139,17 +128,9 @@ def display_menu(menu_dict):
 
 # Helper function to process user clicks
 def handle_user_selection(value):
+    # --- CHANGE APPLIED HERE: REMOVE USER ACTION LOGGING ---
+    # We no longer log the "Selected: ..." message to the chat history.
     
-    CONFIRMATION_MESSAGE = "✅ Got it! Ready for your next question."
-    # The empty string is what we overwrite the message with. The CSS targets this empty content.
-    INVISIBLE_PLACEHOLDER = "" 
-
-    # --- FIX APPLIED HERE: OVERWRITE LAST MESSAGE ---
-    if st.session_state.chat_history and st.session_state.chat_history[-1]['content'] == CONFIRMATION_MESSAGE:
-        # Overwrite the confirmation message with the empty placeholder
-        st.session_state.chat_history[-1]['content'] = INVISIBLE_PLACEHOLDER
-
-
     # 1. Check if the selection is a main category (i.e., a subject)
     if value in st.session_state.main_menu.values():
         st.session_state.current_menu_key = value
@@ -166,8 +147,8 @@ def handle_user_selection(value):
         # After answering, return to the main menu
         st.session_state.current_menu_key = "MAIN"
         
-        # Add the confirmation message (which will be overwritten on next click)
-        st.session_state.chat_history.append({"role": "assistant", "content": CONFIRMATION_MESSAGE})
+        # --- IMPROVED CONVERSATIONAL CLOSURE ---
+        st.session_state.chat_history.append({"role": "assistant", "content": "✅ Got it! Ready for your next question."})
 
 
 # 4. Display Chat History
