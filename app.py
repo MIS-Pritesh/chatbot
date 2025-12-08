@@ -81,11 +81,10 @@ def get_fixed_answer(question):
 
 
 # ======================================================================
-# 3. THEME INJECTION AND STREAMLIT SETUP (Sidebar Removed)
+# 3. THEME INJECTION AND STREAMLIT SETUP (Clean UI)
 # ======================================================================
 
-# --- Simplified Theme Injection (Defaults to Dark, No User Control) ---
-# To keep the code clean without the sidebar, we just force a default theme.
+# --- Simplified Theme Injection (Forces a default dark theme) ---
 def inject_default_css():
     css = """
     :root {
@@ -96,7 +95,6 @@ def inject_default_css():
     """
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
-# Apply a default theme
 inject_default_css()
 
 # --- State Initialization ---
@@ -128,32 +126,30 @@ def display_menu(menu_dict):
 
 # Helper function to process user clicks
 def handle_user_selection(value):
-    # --- CHANGE APPLIED HERE: REMOVE USER ACTION LOGGING ---
-    # We no longer log the "Selected: ..." message to the chat history.
+    # Log the question (user's selection) as an action by the bot for continuity
+    st.session_state.chat_history.append({"role": "assistant", "content": f"**Question:** {value}"})
     
     # 1. Check if the selection is a main category (i.e., a subject)
     if value in st.session_state.main_menu.values():
         st.session_state.current_menu_key = value
         
-    # 2. The selection is a specific question
+    # 2. The selection is a specific question (Answer it)
     else:
-        # Log the question and answer from the Assistant's perspective
-        st.session_state.chat_history.append({"role": "assistant", "content": f"**Question:** {value}"})
-        
         answer = get_fixed_answer(value)
         
+        # Log the final answer
         st.session_state.chat_history.append({"role": "assistant", "content": f"**Answer:** {answer}"})
         
-        # After answering, return to the main menu
+        # After answering, return to the main menu immediately (no conversational closure)
         st.session_state.current_menu_key = "MAIN"
-        
-        # --- IMPROVED CONVERSATIONAL CLOSURE ---
-        st.session_state.chat_history.append({"role": "assistant", "content": "✅ Got it! Ready for your next question."})
+        # THE LINE THAT ADDED THE UNNECESSARY MESSAGE HAS BEEN REMOVED HERE
 
 
 # 4. Display Chat History
 for message in st.session_state.chat_history:
-    with st.chat_message(message["role"]):
+    # Use a custom icon for the assistant to distinguish from the system prompt
+    icon = "🤖" if message["role"] == "assistant" else "👤" 
+    with st.chat_message(message["role"], avatar=icon):
         st.markdown(message["content"])
 
 
