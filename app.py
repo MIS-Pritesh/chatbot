@@ -84,7 +84,7 @@ def get_fixed_answer(question):
 # ======================================================================
 
 # --- CSS to Hide the Overwritten Message ---
-# We use CSS to hide any chat message that contains the zero-width space (\u200B).
+# The CSS hides any chat message element that has no visible text inside it.
 def inject_final_css():
     css = """
     /* Default Theme */
@@ -93,14 +93,16 @@ def inject_final_css():
         --background-color: #1c1c1c; 
         --text-color: #CCCCCC;
     }
-    /* Hide the overwritten chat message completely */
-    .stChatMessage [data-testid="stMarkdownContainer"]:empty, 
-    .stChatMessage [data-testid="stMarkdownContainer"]:has(:empty) {
-        visibility: hidden;
-        height: 0;
-        margin: 0;
-        padding: 0;
-        border: none;
+    
+    /* Target the container of the chat message that has no content */
+    .stChatMessage [data-testid="stChatMessageContent"] > div:empty {
+        display: none !important; /* Forces the box to disappear */
+    }
+    /* Also remove padding/margin from the parent container */
+    .stChatMessage [data-testid="stChatMessageContent"] {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 0 !important;
     }
     """
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
@@ -139,7 +141,7 @@ def display_menu(menu_dict):
 def handle_user_selection(value):
     
     CONFIRMATION_MESSAGE = "✅ Got it! Ready for your next question."
-    # Unique character used to overwrite the message and trigger CSS hiding
+    # The empty string is what we overwrite the message with. The CSS targets this empty content.
     INVISIBLE_PLACEHOLDER = "" 
 
     # --- FIX APPLIED HERE: OVERWRITE LAST MESSAGE ---
