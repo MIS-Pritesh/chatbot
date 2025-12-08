@@ -180,7 +180,7 @@ def handle_user_selection(value):
         
         # After answering, return to the main menu
         st.session_state.current_menu_key = "MAIN"
-        st.session_state.chat_history.append({"role": "assistant", "content": "Answer provided. Please choose a new category from the main menu."})
+        st.session_state.chat_history.append({"role": "assistant", "content": "📋 Ready for your next question."})
 
 
 # 4. Display Chat History
