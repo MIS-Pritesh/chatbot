@@ -7,7 +7,7 @@ from collections import OrderedDict
 # 1. DATA LOADING AND PROCESSING
 # ======================================================================
 
-# FIX APPLIED HERE: File name must match your GitHub file name exactly
+# File name must match your GitHub file name exactly
 CSV_FILE_NAME = "Data.csv" 
 
 @st.cache_data
@@ -17,35 +17,28 @@ def load_and_structure_data(file_name):
     for menu display, and returns the main subjects and sub-menus.
     Uses st.cache_data to run only once.
     """
-    # --- Robust Path Finding ---
-    # 1. Construct the absolute path by joining the script's directory with the filename.
     script_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(script_dir, file_name)
     
-    # Check one last time before raising the error
     if not os.path.exists(file_path):
         st.error(f"FATAL ERROR: Data file '{file_name}' not found. Please ensure the file is named **Data.csv** and is in the same directory as app.py.")
-        return OrderedDict(), {}
-    # ---------------------------
+        return OrderedDict(), {}, pd.DataFrame()
     
     try:
         df = pd.read_csv(file_path)
-        
         REQUIRED_COLS = ['subject', 'question', 'answer']
         if not all(col in df.columns for col in REQUIRED_COLS):
             st.error(f"FATAL ERROR: CSV must contain the columns: {', '.join(REQUIRED_COLS)}")
-            return OrderedDict(), {}
+            return OrderedDict(), {}, pd.DataFrame()
         
         main_menu = OrderedDict() 
         sub_menus = {}
         grouped_data = df.groupby('subject')
         
         for subject, group in grouped_data:
-            # Build the Main Menu (subjects)
             key = str(len(main_menu) + 1)
             main_menu[key] = subject
             
-            # Build the Sub-Menu (questions for that subject)
             sub_menu_questions = OrderedDict()
             for i, row in enumerate(group.itertuples()):
                 q_key = str(i + 1)
@@ -53,10 +46,10 @@ def load_and_structure_data(file_name):
             
             sub_menus[subject] = sub_menu_questions
 
-        return main_menu, sub_menus, df # Return the dataframe too
+        return main_menu, sub_menus, df
 
     except Exception as e:
-        st.error(f"FATAL ERROR: Failed to load or process CSV data. Check file formatting. Error: {e}")
+        st.error(f"FATAL ERROR: Failed to load or process CSV data. Error: {e}")
         return OrderedDict(), {}, pd.DataFrame()
 
 # Load data only once at the start of the session
@@ -88,55 +81,23 @@ def get_fixed_answer(question):
 
 
 # ======================================================================
-# 3. THEME INJECTION AND STREAMLIT SETUP
+# 3. THEME INJECTION AND STREAMLIT SETUP (Sidebar Removed)
 # ======================================================================
 
-def inject_theme_css(theme):
-    """Injects custom CSS based on the selected theme."""
-    
-    custom_themes = {
-        "Classic Light": {
-            "--primary-color": "#4CAF50",  # Green button/link color
-            "--background-color": "#F0F2F6", # Very light grey background
-            "--text-color": "#333333",
-        },
-        "Developer Dark": {
-            "--primary-color": "#FF4B4B",  # Streamlit default red buttons
-            "--background-color": "#1C1C1C", # Dark charcoal background
-            "--text-color": "#CCCCCC",
-        }
+# --- Simplified Theme Injection (Defaults to Dark, No User Control) ---
+# To keep the code clean without the sidebar, we just force a default theme.
+def inject_default_css():
+    css = """
+    :root {
+        --primary-color: #4CAF50; 
+        --background-color: #1c1c1c; 
+        --text-color: #CCCCCC;
     }
-
-    if theme == "Streamlit Default":
-        st.markdown("<style></style>", unsafe_allow_html=True)
-        return
-
-    css_vars = custom_themes.get(theme, {})
-    
-    # Construct the CSS string
-    css = ":root {\n"
-    for var, color in css_vars.items():
-        css += f"  {var}: {color};\n"
-    css += "}\n"
-    
-    # Inject the CSS into the Streamlit app
+    """
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
-
-# --- Theme Selector Logic ---
-# st.sidebar.header("App Settings")
-# selected_theme = st.sidebar.selectbox(
-#     "Select App Theme:",
-#     ["Classic Light", "Developer Dark", "Streamlit Default"]
-# )
-
-# if 'app_theme' not in st.session_state or st.session_state.app_theme != selected_theme:
-#     st.session_state.app_theme = selected_theme
-#     st.rerun() # Rerun to apply new theme immediately
-
-# # Apply the theme CSS
-# inject_theme_css(st.session_state.app_theme)
-
+# Apply a default theme
+inject_default_css()
 
 # --- State Initialization ---
 if "chat_history" not in st.session_state:
@@ -145,6 +106,7 @@ if "chat_history" not in st.session_state:
 
 if "current_menu_key" not in st.session_state:
     st.session_state.current_menu_key = "MAIN"
+
 
 st.title("CSV-Driven Q&A Bot 🏡")
 
@@ -166,7 +128,8 @@ def display_menu(menu_dict):
 
 # Helper function to process user clicks
 def handle_user_selection(value):
-    st.session_state.chat_history.append({"role": "user", "content": f"Selected: {value}"})
+    # --- CHANGE APPLIED HERE: REMOVE USER ACTION LOGGING ---
+    # We no longer log the "Selected: ..." message to the chat history.
     
     # 1. Check if the selection is a main category (i.e., a subject)
     if value in st.session_state.main_menu.values():
@@ -174,13 +137,18 @@ def handle_user_selection(value):
         
     # 2. The selection is a specific question
     else:
+        # Log the question and answer from the Assistant's perspective
+        st.session_state.chat_history.append({"role": "assistant", "content": f"**Question:** {value}"})
+        
         answer = get_fixed_answer(value)
         
-        st.session_state.chat_history.append({"role": "assistant", "content": f"**Question:** {value}\n\n**Answer:** {answer}"})
+        st.session_state.chat_history.append({"role": "assistant", "content": f"**Answer:** {answer}"})
         
         # After answering, return to the main menu
         st.session_state.current_menu_key = "MAIN"
-        st.session_state.chat_history.append({"role": "assistant", "content": "📋 Ready for your next question."})
+        
+        # --- IMPROVED CONVERSATIONAL CLOSURE ---
+        st.session_state.chat_history.append({"role": "assistant", "content": "✅ Got it! Ready for your next question."})
 
 
 # 4. Display Chat History
@@ -189,7 +157,7 @@ for message in st.session_state.chat_history:
         st.markdown(message["content"])
 
 
-# 5. Menu Display Logic (only if data loaded)
+# 5. Menu Display Logic
 if st.session_state.main_menu:
     if st.session_state.current_menu_key == "MAIN":
         display_menu(st.session_state.main_menu)
