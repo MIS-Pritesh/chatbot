@@ -137,19 +137,31 @@ def handle_user_selection(key, value):
         st.session_state.chat_history.append({"role": "assistant", "content": "Answer provided. Please choose a new category from the main menu."})
 
 
+# ======================================================================
+# ... Sections 1, 2, and 3 (Data, Logic, and State Initialization) remain the same ...
+# ... Place the revised code below after Section 3's state initialization ...
+# ======================================================================
+
+
 # 4. Display Chat History
 for message in st.session_state.chat_history:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 5. Handle Dynamic Plot Number Input
+# ----------------------------------------------------------------------
+# 5. DYNAMIC PLOT NUMBER INPUT HANDLER (REVISED)
+# ----------------------------------------------------------------------
+
+# Check if the bot is currently waiting for the user to enter a plot number
 if st.session_state.awaiting_plot_number:
     
-    # Create the text input box and process its submission
-    plot_input = st.text_input("Enter Plot Number:", key="plot_number_input")
+    # 5a. Render the input field right after the chat history
+    plot_input = st.text_input("Enter Plot Number (e.g., 101, 115):", key="plot_number_input_field")
     
+    # 5b. Process the submission if the user enters text and hits Enter
     if plot_input:
-        # User submitted a plot number
+        
+        # Log the user's input
         st.session_state.chat_history.append({"role": "user", "content": f"Plot number entered: **{plot_input}**"})
         
         # Get the dynamic details
@@ -161,33 +173,50 @@ if st.session_state.awaiting_plot_number:
         # Reset the state and return to the main menu
         st.session_state.awaiting_plot_number = False
         st.session_state.current_menu_key = "MAIN"
-        st.session_state.chat_history.append({"role": "assistant", "content": "Plot details provided. Please select a new action from the menu above."})
-        st.rerun() # Rerun to refresh the UI and remove the input box
-
-# 6. Handle Menu Display
-if st.session_state.current_menu_key == "MAIN":
-    # Only display the menu if we are not waiting for plot input
-    if not st.session_state.awaiting_plot_number:
-        display_menu(MAIN_MENU)
-else:
-    # Display the sub-menu options
-    menu_to_display = SUB_MENUS.get(st.session_state.current_menu_key, {})
-    
-    # Add the "Go Back" button
-    back_button_key = f"back_btn_{st.session_state.current_menu_key}"
-    if st.button("⬅️ Go Back to Main Menu", key=back_button_key):
-        st.session_state.current_menu_key = "MAIN"
-        # Reset awaiting state just in case
-        st.session_state.awaiting_plot_number = False 
+        st.session_state.chat_history.append({"role": "assistant", "content": "Plot details provided. Please select a new action from the menu below."})
+        
+        # IMPORTANT: Rerun the app to clear the input box and show the main menu
         st.rerun()
 
-    # If the sub-menu is the plot lookup trigger, execute the action immediately
-    if "ACTION_INPUT" in menu_to_display:
-        handle_user_selection("ACTION_INPUT", "Enter Plot Number")
-        # Since handle_user_selection calls st.rerun internally, no need to call it again here.
-    else:
-        # Display buttons for other sub-menus (Legal/Amenities)
-        display_menu(menu_to_display)
+# ----------------------------------------------------------------------
+# 6. MENU DISPLAY LOGIC (REVISED)
+# ----------------------------------------------------------------------
 
+# Only display the menu if the bot is NOT waiting for plot input
+if not st.session_state.awaiting_plot_number:
+    
+    # Check if we are at the main menu level
+    if st.session_state.current_menu_key == "MAIN":
+        
+        # Display the main categories
+        display_menu(MAIN_MENU)
+        
+    # Check if we are in a sub-menu level
+    else:
+        
+        # Display the "Go Back" button
+        back_button_key = f"back_btn_{st.session_state.current_menu_key}"
+        if st.button("⬅️ Go Back to Main Menu", key=back_button_key):
+            st.session_state.current_menu_key = "MAIN"
+            st.rerun()
+
+        menu_to_display = SUB_MENUS.get(st.session_state.current_menu_key, {})
+
+        # Handle Plot Status Lookup trigger immediately
+        if st.session_state.current_menu_key == "Plot Status Lookup (Enter Plot Number)":
+            # Set the state to await input and rerun to show the input box
+            st.session_state.awaiting_plot_number = True
+            st.session_state.current_menu_key = "MAIN" # Return menu state to main
+            
+            # Log the message telling the user to enter the number
+            st.session_state.chat_history.append({"role": "assistant", "content": "Please enter the plot number (e.g., 101, 115) in the box below and hit Enter."})
+            st.rerun()
+            
+        else:
+            # Display buttons for other sub-menus (Legal/Amenities)
+            display_menu(menu_to_display)
+            
+st.sidebar.markdown("---")
+st.sidebar.caption("This PlotBot runs on Streamlit's free tier, using fixed-rule logic and dynamic input handling.")
 st.sidebar.markdown("---")
 st.sidebar.caption("This PlotBot runs on Streamlit's free tier, using fixed-rule logic and dynamic input handling.")
