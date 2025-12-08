@@ -1,146 +1,145 @@
 import streamlit as st
+import pandas as pd
+import os
 from collections import OrderedDict
 
 # ======================================================================
-# 1. DATA AND KNOWLEDGE BASE
+# 1. DATA LOADING AND PROCESSING
 # ======================================================================
 
-# Simulate your database/backend data
-PLOT_DATA = {
-    '101': {'status': 'SOLD', 'size': 1200, 'price': '₹45,00,000'},
-    '105': {'status': 'AVAILABLE', 'size': 1500, 'price': '₹56,00,000'},
-    '115': {'status': 'HOLD', 'size': 900, 'price': '₹34,00,000'},
-    '200': {'status': 'AVAILABLE', 'size': 1800, 'price': '₹65,00,000'},
-    # Add all your plots here...
-}
+# Define the expected filename
+CSV_FILE_PATH = "data.csv"
 
-# --- MENU STRUCTURE MODIFIED ---
-# "Plot Status & Details" category will now lead to the input box.
+def load_and_structure_data(file_path):
+    """
+    Loads data from CSV, structures it into an organized dictionary
+    for menu display, and returns the main subjects and sub-menus.
+    """
+    if not os.path.exists(file_path):
+        st.error(f"FATAL ERROR: Data file '{file_path}' not found in the deployment directory.")
+        return OrderedDict(), {}
 
-MAIN_MENU = OrderedDict([
-    ("1", "Plot Status Lookup (Enter Plot Number)"), # Changed label
-    ("2", "Legal & Financing Questions"),
-    ("3", "General Project & Amenities"),
-])
+    try:
+        # Load the CSV file
+        df = pd.read_csv(file_path)
+        
+        # Ensure required columns exist
+        REQUIRED_COLS = ['subject', 'question', 'answer']
+        if not all(col in df.columns for col in REQUIRED_COLS):
+            st.error(f"FATAL ERROR: CSV must contain the columns: {', '.join(REQUIRED_COLS)}")
+            return OrderedDict(), {}
+        
+        # Use OrderedDict to maintain the order of main subjects based on first appearance
+        main_menu = OrderedDict() 
+        sub_menus = {}
 
-SUB_MENUS = {
-    # This sub-menu is now just a placeholder/trigger for the text input
-    "Plot Status Lookup (Enter Plot Number)": OrderedDict([
-        ("ACTION_INPUT", "Enter Plot Number"), # NEW: Special action key
-    ]),
-    
-    # Other sub-menus remain the same for fixed Q&A
-    "Legal & Financing Questions": OrderedDict([
-        ("1", "Is the project RERA registered? What is the ID?"),
-        ("2", "Are bank loans available for this project?"),
-        ("3", "What is the policy for booking cancellation/refund?"),
-    ]),
-    "General Project & Amenities": OrderedDict([
-        ("1", "What are the key amenities provided in the project?"),
-        ("2", "What is the distance to the nearest main road?"),
-        ("3", "What is the expected possession date?"),
-    ])
-}
+        # Group data by the 'subject' column
+        grouped_data = df.groupby('subject')
+        
+        for subject, group in grouped_data:
+            # 1. Build the Main Menu (subjects)
+            # Find a unique key for the main menu, e.g., '1', '2', etc.
+            key = str(len(main_menu) + 1)
+            main_menu[key] = subject
+            
+            # 2. Build the Sub-Menu (questions for that subject)
+            sub_menu_questions = OrderedDict()
+            for i, row in enumerate(group.itertuples()):
+                q_key = str(i + 1)
+                sub_menu_questions[q_key] = row.question
+            
+            sub_menus[subject] = sub_menu_questions
+
+        # 3. Store the full Q&A dataframe for quick answer lookup
+        # Use cache=True for better performance, but Streamlit handles caching for load_data() 
+        st.session_state.qa_data = df
+        
+        return main_menu, sub_menus
+
+    except Exception as e:
+        st.error(f"FATAL ERROR: Failed to load or process CSV data. Check file permissions or formatting. Error: {e}")
+        return OrderedDict(), {}
+
+# Load data only once at the start of the session
+if 'main_menu' not in st.session_state:
+    st.session_state.main_menu, st.session_state.sub_menus = load_and_structure_data(CSV_FILE_PATH)
+
 
 # ======================================================================
-# 2. ANSWER RETRIEVAL LOGIC (Updated to handle dynamic lookup)
+# 2. ANSWER RETRIEVAL LOGIC
 # ======================================================================
-
-def get_plot_details(plot_number):
-    """Retrieves dynamic plot details based on the user input number."""
-    info = PLOT_DATA.get(plot_number)
-    
-    if info:
-        return (
-            f"### Details for Plot {plot_number}:"
-            f"\n\n**Status:** **{info['status']}**"
-            f"\n**Size:** **{info['size']} sq. ft.**"
-            f"\n**Price (All-inclusive):** **{info['price']}**"
-        )
-    return f"Plot **{plot_number}** not found. Please check your plot number and try again."
-
 
 def get_fixed_answer(question):
-    """Retrieves fixed answers for legal/amenities questions."""
-    
-    if "RERA registered" in question:
-        return "Yes, the project is fully RERA registered. RERA ID: **RERA/P/1234/5678**."
-    elif "bank loans" in question:
-        return "Bank loans are available from **HDFC, SBI, and ICICI** as the project is pre-approved."
-    elif "cancellation/refund" in question:
-        return "A full refund is provided if cancellation occurs within 7 days of booking, subject to administrative fees."
-    elif "amenities" in question:
-        return "Key amenities include a paved road network, 24/7 water supply, electricity, and a dedicated park area."
-    elif "main road" in question:
-        return "The site is located just **500 meters** from the main National Highway."
-    elif "possession date" in question:
-        return "The expected date of possession is **Q4 2026**."
+    """Retrieves the answer by searching the loaded DataFrame."""
+    if 'qa_data' not in st.session_state:
+        return "System error: Data not loaded."
         
-    return "Error: Could not retrieve a specific answer for this question."
+    try:
+        # Search the DataFrame for the matching question
+        answer_row = st.session_state.qa_data[st.session_state.qa_data['question'] == question]
+        
+        if not answer_row.empty:
+            # Return the first matching answer
+            return answer_row.iloc[0]['answer']
+        
+        return "I'm sorry, I could not find a specific answer for that question in my database."
+    except Exception as e:
+        return f"An internal error occurred during lookup: {e}"
+
 
 # ======================================================================
-# 3. STREAMLIT APPLICATION SETUP
+# 3. STREAMLIT APPLICATION SETUP AND UI
 # ======================================================================
 
 # --- State Initialization ---
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-    st.session_state.chat_history.append({"role": "assistant", "content": "Hello! I am PlotBot, your assistant. Please select a category below to get started."})
+    st.session_state.chat_history.append({"role": "assistant", "content": "Hello! I am PlotBot, your Q&A assistant. Please select a category below to get started."})
 
 if "current_menu_key" not in st.session_state:
     st.session_state.current_menu_key = "MAIN"
 
-if "awaiting_plot_number" not in st.session_state:
-    st.session_state.awaiting_plot_number = False
+st.title("CSV-Driven Q&A Bot 🏡")
+st.sidebar.header("Data Source")
+st.sidebar.info(f"Loaded {len(st.session_state.main_menu)} main subjects from **{CSV_FILE_PATH}**.")
 
-st.title("Plot Management Q&A Bot 🏡")
-st.sidebar.header("Navigation")
 
 # Helper function to display the current menu buttons
 def display_menu(menu_dict):
     st.markdown("### Choose an Option:")
     
-    # Layout buttons in columns for better appearance
+    # Use columns for a clean button layout (up to 3 buttons per row)
     cols = st.columns(3) 
     
     for i, (key, value) in enumerate(menu_dict.items()):
-        # Use a unique key for each button and pass the menu action
+        
         button_key = f"btn_{st.session_state.current_menu_key}_{key}"
         
-        # We need to handle the button logic slightly differently if we use columns
         if cols[i % 3].button(value, key=button_key):
-            handle_user_selection(key, value)
+            handle_user_selection(value)
             st.rerun() 
 
+
 # Helper function to process user clicks
-def handle_user_selection(key, value):
+def handle_user_selection(value):
+    # 1. Log the User's question/action
     st.session_state.chat_history.append({"role": "user", "content": f"Selected: {value}"})
     
-    # 1. Check if the selection is the special input action
-    if key == "ACTION_INPUT":
-        # Set the state to await the plot number
-        st.session_state.awaiting_plot_number = True
-        st.session_state.chat_history.append({"role": "assistant", "content": "Please enter the plot number (e.g., 101, 115) in the box below and hit Enter."})
-        return
-
-    # 2. Check if the selection is a main category
-    if st.session_state.current_menu_key == "MAIN":
+    # 2. Check if the selection is a main category (i.e., a subject)
+    if value in st.session_state.main_menu.values():
+        # Set state to the subject text to display its sub-menu
         st.session_state.current_menu_key = value
         
-    # 3. Handle fixed answers (Legal/Amenities)
+    # 3. The selection is a specific question
     else:
-        # Retrieve the fixed answer
+        # Retrieve the fixed answer using the full question text
         answer = get_fixed_answer(value)
+        
         st.session_state.chat_history.append({"role": "assistant", "content": f"**Question:** {value}\n\n**Answer:** {answer}"})
+        
         # After answering, return to the main menu
         st.session_state.current_menu_key = "MAIN"
         st.session_state.chat_history.append({"role": "assistant", "content": "Answer provided. Please choose a new category from the main menu."})
-
-
-# ======================================================================
-# ... Sections 1, 2, and 3 (Data, Logic, and State Initialization) remain the same ...
-# ... Place the revised code below after Section 3's state initialization ...
-# ======================================================================
 
 
 # 4. Display Chat History
@@ -148,75 +147,26 @@ for message in st.session_state.chat_history:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# ----------------------------------------------------------------------
-# 5. DYNAMIC PLOT NUMBER INPUT HANDLER (REVISED)
-# ----------------------------------------------------------------------
 
-# Check if the bot is currently waiting for the user to enter a plot number
-if st.session_state.awaiting_plot_number:
+# 5. Menu Display Logic
+
+if st.session_state.current_menu_key == "MAIN":
+    # Show the main categories (subjects from CSV)
+    display_menu(st.session_state.main_menu)
+else:
+    # We are in a sub-menu (questions for a specific subject)
     
-    # 5a. Render the input field right after the chat history
-    plot_input = st.text_input("Enter Plot Number (e.g., 101, 115):", key="plot_number_input_field")
+    # Get the dictionary of questions for the current subject key
+    menu_to_display = st.session_state.sub_menus.get(st.session_state.current_menu_key, {})
     
-    # 5b. Process the submission if the user enters text and hits Enter
-    if plot_input:
-        
-        # Log the user's input
-        st.session_state.chat_history.append({"role": "user", "content": f"Plot number entered: **{plot_input}**"})
-        
-        # Get the dynamic details
-        details = get_plot_details(plot_input)
-        
-        # Display the answer
-        st.session_state.chat_history.append({"role": "assistant", "content": details})
-        
-        # Reset the state and return to the main menu
-        st.session_state.awaiting_plot_number = False
+    # Display the "Go Back" button first
+    back_button_key = f"back_btn_{st.session_state.current_menu_key}"
+    if st.button("⬅️ Go Back to Main Menu", key=back_button_key):
         st.session_state.current_menu_key = "MAIN"
-        st.session_state.chat_history.append({"role": "assistant", "content": "Plot details provided. Please select a new action from the menu below."})
-        
-        # IMPORTANT: Rerun the app to clear the input box and show the main menu
         st.rerun()
-
-# ----------------------------------------------------------------------
-# 6. MENU DISPLAY LOGIC (REVISED)
-# ----------------------------------------------------------------------
-
-# Only display the menu if the bot is NOT waiting for plot input
-if not st.session_state.awaiting_plot_number:
-    
-    # Check if we are at the main menu level
-    if st.session_state.current_menu_key == "MAIN":
         
-        # Display the main categories
-        display_menu(MAIN_MENU)
-        
-    # Check if we are in a sub-menu level
-    else:
-        
-        # Display the "Go Back" button
-        back_button_key = f"back_btn_{st.session_state.current_menu_key}"
-        if st.button("⬅️ Go Back to Main Menu", key=back_button_key):
-            st.session_state.current_menu_key = "MAIN"
-            st.rerun()
+    # Display the sub-menu options (questions)
+    display_menu(menu_to_display)
 
-        menu_to_display = SUB_MENUS.get(st.session_state.current_menu_key, {})
-
-        # Handle Plot Status Lookup trigger immediately
-        if st.session_state.current_menu_key == "Plot Status Lookup (Enter Plot Number)":
-            # Set the state to await input and rerun to show the input box
-            st.session_state.awaiting_plot_number = True
-            st.session_state.current_menu_key = "MAIN" # Return menu state to main
-            
-            # Log the message telling the user to enter the number
-            st.session_state.chat_history.append({"role": "assistant", "content": "Please enter the plot number (e.g., 101, 115) in the box below and hit Enter."})
-            st.rerun()
-            
-        else:
-            # Display buttons for other sub-menus (Legal/Amenities)
-            display_menu(menu_to_display)
-            
 st.sidebar.markdown("---")
-st.sidebar.caption("This PlotBot runs on Streamlit's free tier, using fixed-rule logic and dynamic input handling.")
-st.sidebar.markdown("---")
-st.sidebar.caption("This PlotBot runs on Streamlit's free tier, using fixed-rule logic and dynamic input handling.")
+st.sidebar.caption("This Q&A Bot is a 100% free solution powered by Python, Pandas, and Streamlit.")
