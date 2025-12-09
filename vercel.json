@@ -8,8 +8,16 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/(index\\.html|script\\.js|favicon\\.ico)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/api/(.*)",
       "dest": "api.py"
+    },
+    {
+      "src": "/",
+      "dest": "index.html"
     }
   ]
 }
