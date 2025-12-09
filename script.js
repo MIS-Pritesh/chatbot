@@ -1,7 +1,7 @@
 // script.js
 // --- CONFIGURATION ---
 // PASTE YOUR ACTUAL VERCEL DOMAIN HERE (e.g., https://chatbot-e56m.vercel.app)
-const API_BASE_URL = 'https://chatbot-e56m.vercel.app'; // <--- **THIS MUST BE YOUR LIVE VERCEL LINK**
+const API_BASE_URL = 'https://chatbot-e5dm.vercel.app/'; // <--- **THIS MUST BE YOUR LIVE VERCEL LINK**
 
 // ... (rest of the code remains the same)
 
