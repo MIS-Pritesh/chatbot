@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlotBot Q&A</title>
+    <style>
+        body { font-family: sans-serif; background-color: #1c1c1c; color: #CCCCCC; margin: 0; padding: 20px; }
+        .chat-container { max-width: 600px; margin: 0 auto; background-color: #333; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); }
+        .message { margin-bottom: 15px; padding: 10px; border-radius: 5px; }
+        .bot { background-color: #444; border-left: 4px solid #4CAF50; }
+        .user { background-color: #555; text-align: right; }
+        .options { margin-top: 20px; padding-top: 15px; border-top: 1px solid #555; }
+        .options button { 
+            background-color: #4CAF50; color: white; border: none; padding: 10px 15px; 
+            margin: 5px; cursor: pointer; border-radius: 5px; font-size: 14px; 
+            transition: background-color 0.3s;
+        }
+        .options button:hover { background-color: #45a049; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h1>PlotBot Q&A Assistant 🏡</h1>
+        <div id="chatHistory">
+            <div class="message bot">Hello! I am PlotBot, your Q&A assistant. Please select a category below to get started.</div>
+        </div>
+
+        <div id="optionsContainer" class="options">
+            </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
